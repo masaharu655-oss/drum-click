@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>DRUM CLICK PRO - プレイリスト＆セトリ対応ステージメトロノーム</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --panel: #181b22;
+      --border: #2a2f3d;
+      --text: #f0f2f5;
+      --muted: #8b949e;
+      --accent: #00e5ff;
+      --accent-glow: rgba(0, 229, 255, 0.35);
+      --warn: #ffbe0b;
+      --danger: #ff3b30;
+      --success: #00e676;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ヘッダー・モード切替 */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 16px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 6px;
+      background: var(--bg);
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .mode-tab {
+      padding: 8px 14px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .mode-tab.active {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* メインステージ表示エリア */
+    .stage-monitor {
+      padding: 16px;
+      margin: 12px 12px 8px;
+      background: var(--panel);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      text-align: center;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    .stage-monitor.warn-next {
+      border-color: var(--warn);
+      box-shadow: 0 0 20px rgba(255, 190, 11, 0.3);
+    }
+
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.95rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .section-badge {
+      background: #252a36;
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-weight: 700;
+    }
+
+    .current-song-banner {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .bpm-display-wrap {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 10px;
+      margin: 2px 0;
+    }
+
+    .bpm-number {
+      font-size: 4.5rem;
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .bpm-label {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .bar-counter {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 6px 0 10px;
+      color: #fff;
+    }
+
+    .next-preview {
+      font-size: 0.9rem;
+      color: var(--warn);
+      min-height: 1.3em;
+      font-weight: 700;
+      margin-bottom: 12px;
+    }
+
+    /* ビジュアルビートランプ */
+    .beat-lamps {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .lamp {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #222630;
+      border: 2px solid #353b4a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.2rem;
+      color: var(--muted);
+      transition: transform 0.05s;
+    }
+
+    .lamp.active-1 {
+      background: var(--danger);
+      border-color: #ff8a80;
+      color: #fff;
+      box-shadow: 0 0 24px rgba(255, 59, 48, 0.8);
+      transform: scale(1.12);
+    }
+
+    .lamp.active {
+      background: var(--accent);
+      border-color: #b2ebf2;
+      color: #000;
+      box-shadow: 0 0 20px var(--accent-glow);
+      transform: scale(1.08);
+    }
+
+    /* 再生コントロール */
+    .transport-controls {
+      display: grid;
+      grid-template-columns: 1fr 2fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 12px;
+      padding: 16px 12px;
+      font-size: 1.05rem;
+      font-weight: 800;
+      cursor: pointer;
+      background: #252a36;
+      color: var(--text);
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-play {
+      background: var(--success);
+      color: #000;
+      font-size: 1.35rem;
+    }
+
+    .btn-play.playing {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    /* Spotify風 プレイリスト＆ライブラリセクション */
+    .spotify-section {
+      margin: 8px 12px 12px;
+      background: linear-gradient(180deg, #1e2430 0%, var(--panel) 45%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+    }
+
+    .playlist-shelf-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .shelf-title {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .new-pl-btn {
+      background: #252a36;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    /* 横スクロール・プレイリストカード */
+    .playlist-cards {
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .playlist-cards::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    .playlist-cards::-webkit-scrollbar-thumb {
+      background: #353b4a;
+      border-radius: 4px;
+    }
+
+    .pl-card {
+      min-width: 145px;
+      background: #101318;
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .pl-card.active {
+      border-color: var(--accent);
+      background: #162330;
+    }
+
+    .pl-card-icon {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #252a36, #181b22);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .pl-card.active .pl-card-icon {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .pl-card-name {
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .pl-card-count {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* 選択中プレイリストのヘッダー（Spotifyのアルバム上部風） */
+    .active-pl-hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .active-pl-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pl-badge {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+    }
+
+    .active-pl-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .active-pl-title {
+      font-size: 1.35rem;
+      font-weight: 900;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .mini-edit-icon {
+      background: #252a36;
+      border: none;
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .active-pl-meta {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .add-track-pill {
+      background: var(--success);
+      color: #000;
+      border: none;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Spotify風 トラックリスト */
+    .tracklist-columns {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      padding: 0 12px 6px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 6px;
+    }
+
+    .tracklist-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .track-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+
+    .track-row:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .track-row.selected {
+      background: rgba(0, 229, 255, 0.12);
+    }
+
+    .track-row-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .track-index {
+      width: 24px;
+      text-align: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+
+    .track-row.selected .track-index {
+      color: var(--success);
+    }
+
+    .track-details {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .track-title-text {
+      font-weight: 800;
+      font-size: 1rem;
+      color: #fff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-row.selected .track-title-text {
+      color: var(--accent);
+    }
+
+    .track-sub-text {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .track-row-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 8px;
+    }
+
+    .row-btn {
+      background: #252a36;
+      border: none;
+      color: var(--text);
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* パネル切り替え領域 */
+    .panel-container {
+      padding: 0 12px 16px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* タイムライン（選択中の曲の構成編集） */
+    .editor-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .editor-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--muted);
+    }
+
+    .song-edit-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .text-input {
+      flex: 1;
+      background: #101318;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .text-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .quick-add-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+
+    .chip-btn {
+      background: #252a36;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      padding: 8px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .timeline-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-card {
+      background: #101318;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-card.current-playing {
+      border-color: var(--accent);
+      background: #1a2430;
+    }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sec-name-input {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      width: 135px;
+    }
+
+    .card-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+    }
+
+    .mini-group {
+      display: flex;
+      align-items: center;
+      background: var(--panel);
+      border-radius: 8px;
+      padding: 4px 6px;
+      gap: 4px;
+    }
+
+    .mini-btn {
+      background: #282e3d;
+      border: none;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .val-box {
+      min-width: 36px;
+      text-align: center;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      background: #252a36;
+      border: none;
+      color: var(--muted);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .icon-btn.del {
+      color: var(--danger);
+    }
+
+    /* シンプルモード操作 */
+    .simple-controls {
+      background: var(--panel);
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .bpm-adjust-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tap-btn {
+      width: 100%;
+      padding: 18px;
+      background: #2a3142;
+      border: 2px dashed var(--accent);
+      color: var(--accent);
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+    }
+
+    .option-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    /* 音量・パン設定 */
+    .audio-settings {
+      background: var(--panel);
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    .slider-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .song-select {
+      background: #101318;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+
+    input[type="range"] {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">DRUM CLICK PRO</div>
+    <div class="mode-tabs">
+      <button class="mode-tab active" id="tabTimeline" onclick="switchMode('timeline')">プレイリスト・セトリ</button>
+      <button class="mode-tab" id="tabSimple" onclick="switchMode('simple')">単発BPM</button>
+    </div>
+  </header>
+
+  <!-- ステージモニター（共通表示） -->
+  <div class="stage-monitor" id="stageMonitor">
+    <div class="status-bar">
+      <span class="section-badge" id="currentSectionName">イントロ</span>
+      <span id="timeSigDisplay">4/4 拍子</span>
+    </div>
+
+    <div class="current-song-banner" id="currentSongBanner">1. テンポ変化サンプル</div>
+
+    <div class="bpm-display-wrap">
+      <span class="bpm-number" id="bpmDisplay">108</span>
+      <span class="bpm-label">BPM</span>
+    </div>
+
+    <div class="bar-counter" id="barCounterDisplay">待機中 (STARTで再生)</div>
+    <div class="next-preview" id="nextPreviewDisplay">NEXT: Aメロ (108 BPM)</div>
+
+    <div class="beat-lamps" id="beatLamps">
+      <div class="lamp" id="lamp-0">1</div>
+      <div class="lamp" id="lamp-1">2</div>
+      <div class="lamp" id="lamp-2">3</div>
+      <div class="lamp" id="lamp-3">4</div>
+    </div>
+
+    <div class="transport-controls">
+      <button class="btn" onclick="resetPlayback()">最初へ</button>
+      <button class="btn btn-play" id="playBtn" onclick="togglePlay()">START</button>
+      <button class="btn" onclick="tapTempo()">TAP計測</button>
+    </div>
+  </div>
+
+  <!-- Spotify風 プレイリスト＆曲リストエリア -->
+  <div class="spotify-section" id="spotifySection">
+    <div class="playlist-shelf-header">
+      <span class="shelf-title">YOUR PLAYLISTS (セトリ切替)</span>
+      <button class="new-pl-btn" onclick="createNewPlaylist()">＋新規プレイリスト</button>
+    </div>
+
+    <!-- プレイリスト横スクロール一覧 -->
+    <div class="playlist-cards" id="playlistCards"></div>
+
+    <!-- 選択中プレイリストのタイトル＆追加ボタン -->
+    <div class="active-pl-hero">
+      <div class="active-pl-info">
+        <div class="pl-badge">PLAYLIST / SETLIST</div>
+        <div class="active-pl-title-row">
+          <div class="active-pl-title" id="activePlaylistTitle">ライブ本番セトリ</div>
+          <button class="mini-edit-icon" onclick="renameActivePlaylist()" title="プレイリスト名変更">✎名前変更</button>
+          <button class="mini-edit-icon" style="color: var(--danger);" onclick="deleteActivePlaylist()" title="プレイリスト削除">削除</button>
+        </div>
+        <div class="active-pl-meta" id="activePlaylistMeta">2曲 • 合計 70小節</div>
+      </div>
+      <button class="add-track-pill" onclick="createNewSong()">＋曲を追加</button>
+    </div>
+
+    <!-- Spotify風 トラックリストヘッダー -->
+    <div class="tracklist-columns">
+      <span># タイトル / テンポ構成</span>
+      <span>曲名変更・曲順</span>
+    </div>
+
+    <!-- トラック一覧 -->
+    <div class="tracklist-rows" id="tracklistRows"></div>
+  </div>
+
+  <!-- タイムライン（選択中の曲の構成・曲名編集） -->
+  <div class="panel-container" id="timelinePanel">
+    <div class="editor-box">
+      <div class="editor-header">
+        <span>選択中の曲の編集（曲名・テンポ変化）</span>
+        <button class="icon-btn del" onclick="deleteCurrentSong()">この曲を削除</button>
+      </div>
+
+      <div class="song-edit-row">
+        <span style="font-size: 0.85rem; font-weight: 700; color: var(--muted);">曲名:</span>
+        <input type="text" class="text-input" id="songTitleInput" placeholder="ここに入力して曲名を変更" oninput="updateSongTitle()">
+      </div>
+
+      <div class="quick-add-bar">
+        <button class="chip-btn" onclick="addSection('イントロ', 4)">＋イントロ</button>
+        <button class="chip-btn" onclick="addSection('Aメロ', 8)">＋Aメロ</button>
+        <button class="chip-btn" onclick="addSection('Bメロ', 8)">＋Bメロ</button>
+        <button class="chip-btn" onclick="addSection('サビ', 8)">＋サビ</button>
+        <button class="chip-btn" onclick="addSection('間奏', 4)">＋間奏</button>
+        <button class="chip-btn" onclick="addSection('ブレイク(無音)', 2, true)">＋無音ブレイク</button>
+      </div>
+
+      <div class="timeline-list" id="timelineList"></div>
+    </div>
+  </div>
+
+  <!-- シンプル（単発BPM）モード -->
+  <div class="panel-container hidden" id="simplePanel">
+    <div class="simple-controls">
+      <div class="bpm-adjust-row">
+        <button class="btn" onclick="adjustSimpleBpm(-5)">-5</button>
+        <button class="btn" onclick="adjustSimpleBpm(-1)">-1</button>
+        <button class="btn" onclick="multiplySimpleBpm(0.5)">÷2</button>
+        <button class="btn" onclick="adjustSimpleBpm(1)">+1</button>
+        <button class="btn" onclick="adjustSimpleBpm(5)">+5</button>
+      </div>
+      <button class="btn tap-btn" onclick="tapTempo()">画面を叩いてBPM計測 (TAP)</button>
+      <div class="option-row">
+        <span>倍速切り替え (×2)</span>
+        <button class="btn" style="padding: 8px 16px;" onclick="multiplySimpleBpm(2)">×2 倍速</button>
+      </div>
+      <div class="option-row">
+        <span>拍子設定</span>
+        <select id="simpleBeatsSelect" class="song-select" onchange="changeSimpleBeats()">
+          <option value="4">4/4 拍子</option>
+          <option value="3">3/4 拍子</option>
+          <option value="6">6/8 拍子</option>
+          <option value="5">5/4 拍子</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 共通オーディオ・ステージ設定 -->
+  <div class="panel-container">
+    <div class="audio-settings">
+      <div class="slider-row">
+        <span>クリック音量</span>
+        <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.85">
+      </div>
+      <div class="slider-row">
+        <span>出力バランス (将来同期用)</span>
+        <select id="panSelect" class="song-select">
+          <option value="0">センター (両耳)</option>
+          <option value="-1">左 (L) のみ</option>
+          <option value="1">右 (R) のみ</option>
+        </select>
+      </div>
+      <div class="option-row" style="border-top: none; padding-bottom: 0;">
+        <span>スタート前の1小節カウントイン</span>
+        <input type="checkbox" id="precountCheck" checked style="width: 22px; height: 22px;">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // --- Web Audio API 高精度スケジューラ ---
+    let audioCtx = null;
+    let isPlaying = false;
+    let currentMode = 'timeline'; // 'timeline' | 'simple'
+
+    let lookahead = 25.0; // ms
+    let scheduleAheadTime = 0.1; // sec
+    let timerID = null;
+    let nextNoteTime = 0.0;
+
+    let isPrecounting = false;
+    let currentBeatInBar = 0;
+    let currentBarInSection = 0;
+    let currentSectionIndex = 0;
+
+    let simpleBpm = 120;
+    let simpleBeats = 4;
+    let tapTimes = [];
+
+    // デフォルトのプレイリストデータ構造
+    const defaultPlaylists = [
+      {
+        id: 'pl-1',
+        name: 'ライブ本番セトリ',
+        songs: [
+          {
+            id: 'sample-1',
+            title: 'テンポ変化サンプル (BIG UP風)',
+            sections: [
+              { name: 'イントロ (裏打ち)', bpm: 108, bars: 4, beats: 4, mute: false },
+              { name: 'Aメロ (スロー)', bpm: 108, bars: 8, beats: 4, mute: false },
+              { name: 'サビ (高速2ビート)', bpm: 204, bars: 8, beats: 4, mute: false },
+              { name: '2番Aメロ (減速)', bpm: 108, bars: 8, beats: 4, mute: false },
+              { name: 'ブレイク (無音)', bpm: 108, bars: 2, beats: 4, mute: true },
+              { name: 'ラスサビ (爆発)', bpm: 204, bars: 8, beats: 4, mute: false }
+            ]
+          },
+          {
+            id: 'sample-2',
+            title: 'アップテンポ定番曲',
+            sections: [
+              { name: 'イントロ', bpm: 175, bars: 8, beats: 4, mute: false },
+              { name: 'Aメロ', bpm: 175, bars: 16, beats: 4, mute: false },
+              { name: 'サビ', bpm: 175, bars: 16, beats: 4, mute: false }
+            ]
+          }
+        ]
+      },
+      {
+        id: 'pl-2',
+        name: 'スタジオ個人練習用',
+        songs: [
+          {
+            id: 'prac-1',
+            title: '走り防止基礎トレ (BPM 130)',
+            sections: [
+              { name: '8ビートキープ', bpm: 130, bars: 32, beats: 4, mute: false }
+            ]
+          }
+        ]
+      }
+    ];
+
+    let playlists = JSON.parse(localStorage.getItem('drumClickPlaylists')) || defaultPlaylists;
+    let currentPlaylistId = playlists[0].id;
+    let currentSongId = playlists[0].songs[0].id;
+
+    function savePlaylists() {
+      localStorage.setItem('drumClickPlaylists', JSON.stringify(playlists));
+    }
+
+    function getCurrentPlaylist() {
+      return playlists.find(p => p.id === currentPlaylistId) || playlists[0];
+    }
+
+    function getCurrentSong() {
+      const pl = getCurrentPlaylist();
+      return pl.songs.find(s => s.id === currentSongId) || pl.songs[0];
+    }
+
+    // --- 初期化・描画 ---
+    function init() {
+      renderPlaylistShelf();
+      selectPlaylist(currentPlaylistId, currentSongId);
+    }
+
+    function switchMode(mode) {
+      if (isPlaying) stopPlayback();
+      currentMode = mode;
+      document.getElementById('tabTimeline').classList.toggle('active', mode === 'timeline');
+      document.getElementById('tabSimple').classList.toggle('active', mode === 'simple');
+      document.getElementById('spotifySection').classList.toggle('hidden', mode !== 'timeline');
+      document.getElementById('timelinePanel').classList.toggle('hidden', mode !== 'timeline');
+      document.getElementById('simplePanel').classList.toggle('hidden', mode !== 'simple');
+      updateMonitorIdle();
+    }
+
+    // --- プレイリスト操作 ---
+    function renderPlaylistShelf() {
+      const container = document.getElementById('playlistCards');
+      container.innerHTML = '';
+
+      playlists.forEach((pl, idx) => {
+        const isActive = pl.id === currentPlaylistId;
+        const card = document.createElement('div');
+        card.className = 'pl-card' + (isActive ? ' active' : '');
+        card.onclick = () => selectPlaylist(pl.id);
+
+        card.innerHTML = `
+          <div class="pl-card-icon">♫</div>
+          <div class="pl-card-name">${pl.name}</div>
+          <div class="pl-card-count">${pl.songs.length} 曲</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function selectPlaylist(plId, targetSongId = null) {
+      if (isPlaying) stopPlayback();
+      currentPlaylistId = plId;
+      const pl = getCurrentPlaylist();
+      if (!pl.songs || pl.songs.length === 0) {
+        pl.songs = [{
+          id: 'song-' + Date.now(),
+          title: '新しい曲 1',
+          sections: [{ name: 'メイン', bpm: 120, bars: 8, beats: 4, mute: false }]
+        }];
+      }
+      const nextSongId = targetSongId && pl.songs.some(s => s.id === targetSongId)
+        ? targetSongId
+        : pl.songs[0].id;
+
+      renderPlaylistShelf();
+      selectSong(nextSongId);
+    }
+
+    function createNewPlaylist() {
+      const name = prompt('新しいプレイリスト名を入力してください（例：文化祭ライブ、対バンセトリ）', `セトリ ${playlists.length + 1}`);
+      if (!name) return;
+      const newPl = {
+        id: 'pl-' + Date.now(),
+        name: name.trim(),
+        songs: [
+          {
+            id: 'song-' + Date.now(),
+            title: '1曲目（曲名を変更できます）',
+            sections: [
+              { name: 'イントロ', bpm: 120, bars: 4, beats: 4, mute: false },
+              { name: 'Aメロ', bpm: 120, bars: 8, beats: 4, mute: false },
+              { name: 'サビ', bpm: 140, bars: 8, beats: 4, mute: false }
+            ]
+          }
+        ]
+      };
+      playlists.push(newPl);
+      savePlaylists();
+      selectPlaylist(newPl.id);
+    }
+
+    function renameActivePlaylist() {
+      const pl = getCurrentPlaylist();
+      const newName = prompt('プレイリスト名を変更', pl.name);
+      if (!newName || !newName.trim()) return;
+      pl.name = newName.trim();
+      savePlaylists();
+      renderPlaylistShelf();
+      updatePlaylistHero();
+    }
+
+    function deleteActivePlaylist() {
+      if (playlists.length <= 1) {
+        alert('最後の1つのプレイリストは削除できません');
+        return;
+      }
+      const pl = getCurrentPlaylist();
+      if (!confirm(`プレイリスト「${pl.name}」を削除しますか？`)) return;
+      playlists = playlists.filter(p => p.id !== pl.id);
+      savePlaylists();
+      selectPlaylist(playlists[0].id);
+    }
+
+    function updatePlaylistHero() {
+      const pl = getCurrentPlaylist();
+      document.getElementById('activePlaylistTitle').textContent = pl.name;
+      const totalBars = pl.songs.reduce((sum, s) => sum + s.sections.reduce((b, sec) => b + sec.bars, 0), 0);
+      document.getElementById('activePlaylistMeta').textContent = `${pl.songs.length}曲 • 合計 ${totalBars}小節`;
+    }
+
+    // --- Spotify風 トラックリスト描画・曲名変更 ---
+    function renderTracklist() {
+      const pl = getCurrentPlaylist();
+      const container = document.getElementById('tracklistRows');
+      container.innerHTML = '';
+
+      updatePlaylistHero();
+
+      pl.songs.forEach((song, idx) => {
+        const isSelected = song.id === currentSongId;
+        const row = document.createElement('div');
+        row.className = 'track-row' + (isSelected ? ' selected' : '');
+        row.onclick = () => selectSong(song.id);
+
+        const bpms = song.sections.map(s => s.bpm);
+        const minBpm = Math.min(...bpms);
+        const maxBpm = Math.max(...bpms);
+        const bpmRangeText = minBpm === maxBpm ? `${minBpm} BPM` : `${minBpm} → ${maxBpm} BPM`;
+        const totalBars = song.sections.reduce((acc, s) => acc + s.bars, 0);
+
+        row.innerHTML = `
+          <div class="track-row-left">
+            <div class="track-index">${isSelected && isPlaying ? '▶' : idx + 1}</div>
+            <div class="track-details">
+              <div class="track-title-text">${song.title}</div>
+              <div class="track-sub-text">${bpmRangeText} • 全${totalBars}小節 (${song.sections.length}パート)</div>
+            </div>
+          </div>
+          <div class="track-row-right" onclick="event.stopPropagation()">
+            <button class="row-btn" onclick="promptRenameSong('${song.id}')" title="曲名変更">✎</button>
+            <button class="row-btn" onclick="moveSongOrder(${idx}, -1)" title="上へ">↑</button>
+            <button class="row-btn" onclick="moveSongOrder(${idx}, 1)" title="下へ">↓</button>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function selectSong(id) {
+      if (isPlaying) stopPlayback();
+      currentSongId = id;
+      const song = getCurrentSong();
+      document.getElementById('songTitleInput').value = song.title;
+      currentSectionIndex = 0;
+      currentBarInSection = 0;
+      renderTracklist();
+      renderTimeline();
+      updateMonitorIdle();
+    }
+
+    function promptRenameSong(songId) {
+      const pl = getCurrentPlaylist();
+      const target = pl.songs.find(s => s.id === songId);
+      if (!target) return;
+      const newTitle = prompt('新しい曲名を入力してください', target.title);
+      if (!newTitle || !newTitle.trim()) return;
+      target.title = newTitle.trim();
+      savePlaylists();
+      if (songId === currentSongId) {
+        document.getElementById('songTitleInput').value = target.title;
+      }
+      renderTracklist();
+      updateMonitorIdle();
+    }
+
+    function updateSongTitle() {
+      const song = getCurrentSong();
+      song.title = document.getElementById('songTitleInput').value || '無題の曲';
+      savePlaylists();
+      renderTracklist();
+      updateMonitorIdle();
+    }
+
+    function moveSongOrder(idx, dir) {
+      const pl = getCurrentPlaylist();
+      const target = idx + dir;
+      if (target < 0 || target >= pl.songs.length) return;
+      const temp = pl.songs[idx];
+      pl.songs[idx] = pl.songs[target];
+      pl.songs[target] = temp;
+      savePlaylists();
+      renderTracklist();
+      updateMonitorIdle();
+    }
+
+    function createNewSong() {
+      if (isPlaying) stopPlayback();
+      const pl = getCurrentPlaylist();
+      const num = pl.songs.length + 1;
+      const newSong = {
+        id: 'song-' + Date.now(),
+        title: `新しい曲 ${num}`,
+        sections: [
+          { name: 'イントロ', bpm: 120, bars: 4, beats: 4, mute: false },
+          { name: 'Aメロ', bpm: 120, bars: 8, beats: 4, mute: false },
+          { name: 'サビ', bpm: 140, bars: 8, beats: 4, mute: false }
+        ]
+      };
+      pl.songs.push(newSong);
+      savePlaylists();
+      renderPlaylistShelf();
+      selectSong(newSong.id);
+    }
+
+    function deleteCurrentSong() {
+      const pl = getCurrentPlaylist();
+      if (pl.songs.length <= 1) {
+        alert('プレイリスト内の最後の1曲は削除できません');
+        return;
+      }
+      if (!confirm('この曲をプレイリストから削除しますか？')) return;
+      pl.songs = pl.songs.filter(s => s.id !== currentSongId);
+      savePlaylists();
+      renderPlaylistShelf();
+      selectSong(pl.songs[0].id);
+    }
+
+    // --- セクション編集 ---
+    function addSection(name, bars, mute = false) {
+      const song = getCurrentSong();
+      const lastSec = song.sections[song.sections.length - 1];
+      const inheritBpm = lastSec ? lastSec.bpm : 120;
+      song.sections.push({
+        name: name,
+        bpm: inheritBpm,
+        bars: bars,
+        beats: 4,
+        mute: mute
+      });
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+      updateMonitorIdle();
+    }
+
+    function renderTimeline() {
+      const song = getCurrentSong();
+      const list = document.getElementById('timelineList');
+      list.innerHTML = '';
+
+      song.sections.forEach((sec, idx) => {
+        const card = document.createElement('div');
+        card.className = 'section-card' + (isPlaying && !isPrecounting && idx === currentSectionIndex ? ' current-playing' : '');
+
+        card.innerHTML = `
+          <div class="card-top">
+            <input type="text" class="sec-name-input" value="${sec.name}" onchange="updateSectionField(${idx}, 'name', this.value)">
+            <div class="card-actions">
+              <button class="icon-btn" onclick="applyTapToSection(${idx})">BPM反映</button>
+              <button class="icon-btn" onclick="duplicateSection(${idx})">複製</button>
+              <button class="icon-btn" onclick="moveSection(${idx}, -1)">↑</button>
+              <button class="icon-btn" onclick="moveSection(${idx}, 1)">↓</button>
+              <button class="icon-btn del" onclick="removeSection(${idx})">✕</button>
+            </div>
+          </div>
+          <div class="card-controls">
+            <div class="mini-group">
+              <span>BPM:</span>
+              <button class="mini-btn" onclick="changeSecBpm(${idx}, -5)">-5</button>
+              <button class="mini-btn" onclick="changeSecBpm(${idx}, -1)">-1</button>
+              <span class="val-box">${sec.bpm}</span>
+              <button class="mini-btn" onclick="changeSecBpm(${idx}, 1)">+1</button>
+              <button class="mini-btn" onclick="changeSecBpm(${idx}, 5)">+5</button>
+              <button class="mini-btn" onclick="multSecBpm(${idx}, 2)">×2</button>
+              <button class="mini-btn" onclick="multSecBpm(${idx}, 0.5)">÷2</button>
+            </div>
+            <div class="mini-group">
+              <span>小節:</span>
+              <button class="mini-btn" onclick="changeSecBars(${idx}, -1)">-</button>
+              <span class="val-box">${sec.bars}</span>
+              <button class="mini-btn" onclick="changeSecBars(${idx}, 1)">+</button>
+            </div>
+            <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+              <input type="checkbox" ${sec.mute ? 'checked' : ''} onchange="updateSectionField(${idx}, 'mute', this.checked)">
+              <span>無音</span>
+            </label>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function updateSectionField(idx, field, val) {
+      const song = getCurrentSong();
+      song.sections[idx][field] = val;
+      savePlaylists();
+      renderTracklist();
+      if (!isPlaying) updateMonitorIdle();
+    }
+
+    function changeSecBpm(idx, delta) {
+      const song = getCurrentSong();
+      song.sections[idx].bpm = Math.max(30, Math.min(350, song.sections[idx].bpm + delta));
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+      if (!isPlaying) updateMonitorIdle();
+    }
+
+    function multSecBpm(idx, factor) {
+      const song = getCurrentSong();
+      song.sections[idx].bpm = Math.max(30, Math.min(350, Math.round(song.sections[idx].bpm * factor)));
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+      if (!isPlaying) updateMonitorIdle();
+    }
+
+    function changeSecBars(idx, delta) {
+      const song = getCurrentSong();
+      song.sections[idx].bars = Math.max(1, Math.min(128, song.sections[idx].bars + delta));
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+    }
+
+    function duplicateSection(idx) {
+      const song = getCurrentSong();
+      const copy = { ...song.sections[idx] };
+      song.sections.splice(idx + 1, 0, copy);
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+    }
+
+    function moveSection(idx, dir) {
+      const song = getCurrentSong();
+      const target = idx + dir;
+      if (target < 0 || target >= song.sections.length) return;
+      const temp = song.sections[idx];
+      song.sections[idx] = song.sections[target];
+      song.sections[target] = temp;
+      savePlaylists();
+      renderTimeline();
+    }
+
+    function removeSection(idx) {
+      const song = getCurrentSong();
+      if (song.sections.length <= 1) return;
+      song.sections.splice(idx, 1);
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+    }
+
+    // --- シンプルモード操作 ---
+    function adjustSimpleBpm(delta) {
+      simpleBpm = Math.max(30, Math.min(350, simpleBpm + delta));
+      updateMonitorIdle();
+    }
+
+    function multiplySimpleBpm(factor) {
+      simpleBpm = Math.max(30, Math.min(350, Math.round(simpleBpm * factor)));
+      updateMonitorIdle();
+    }
+
+    function changeSimpleBeats() {
+      simpleBeats = parseInt(document.getElementById('simpleBeatsSelect').value, 10);
+      renderBeatLamps(simpleBeats);
+      updateMonitorIdle();
+    }
+
+    // --- タップテンポ計測 ---
+    function tapTempo() {
+      const now = performance.now();
+      if (tapTimes.length > 0 && now - tapTimes[tapTimes.length - 1] > 2000) {
+        tapTimes = [];
+      }
+      tapTimes.push(now);
+      if (tapTimes.length > 5) tapTimes.shift();
+
+      if (tapTimes.length >= 2) {
+        let sum = 0;
+        for (let i = 1; i < tapTimes.length; i++) {
+          sum += tapTimes[i] - tapTimes[i - 1];
+        }
+        const avgMs = sum / (tapTimes.length - 1);
+        const measuredBpm = Math.max(30, Math.min(350, Math.round(60000 / avgMs)));
+
+        if (currentMode === 'simple') {
+          simpleBpm = measuredBpm;
+          updateMonitorIdle();
+        } else {
+          document.getElementById('bpmDisplay').textContent = measuredBpm;
+          window.lastTappedBpm = measuredBpm;
+        }
+      }
+    }
+
+    function applyTapToSection(idx) {
+      if (!window.lastTappedBpm) {
+        alert('先に「TAP計測」ボタンを数回叩いてテンポを測ってください！');
+        return;
+      }
+      const song = getCurrentSong();
+      song.sections[idx].bpm = window.lastTappedBpm;
+      savePlaylists();
+      renderTracklist();
+      renderTimeline();
+      updateMonitorIdle();
+    }
+
+    // --- 再生・スケジューリングエンジン ---
+    function togglePlay() {
+      if (isPlaying) {
+        stopPlayback();
+      } else {
+        startPlayback();
+      }
+    }
+
+    function startPlayback() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      isPlaying = true;
+      const playBtn = document.getElementById('playBtn');
+      playBtn.textContent = 'STOP';
+      playBtn.classList.add('playing');
+
+      currentSectionIndex = 0;
+      currentBarInSection = 0;
+      currentBeatInBar = 0;
+      isPrecounting = document.getElementById('precountCheck').checked;
+
+      if (currentMode === 'timeline') renderTracklist();
+
+      nextNoteTime = audioCtx.currentTime + 0.05;
+      scheduler();
+    }
+
+    function stopPlayback() {
+      isPlaying = false;
+      clearTimeout(timerID);
+      const playBtn = document.getElementById('playBtn');
+      playBtn.textContent = 'START';
+      playBtn.classList.remove('playing');
+      document.getElementById('stageMonitor').classList.remove('warn-next');
+      clearLamps();
+      updateMonitorIdle();
+      if (currentMode === 'timeline') {
+        renderTracklist();
+        renderTimeline();
+      }
+    }
+
+    function resetPlayback() {
+      const wasPlaying = isPlaying;
+      stopPlayback();
+      if (wasPlaying) startPlayback();
+    }
+
+    function getActiveParams() {
+      if (currentMode === 'simple') {
+        return {
+          name: 'フリークリック',
+          bpm: simpleBpm,
+          beats: simpleBeats,
+          bars: 9999,
+          mute: false,
+          nextSection: null
+        };
+      }
+      const song = getCurrentSong();
+      const sec = song.sections[currentSectionIndex];
+      const nextSec = song.sections[currentSectionIndex + 1] || null;
+      return {
+        name: sec.name,
+        bpm: sec.bpm,
+        beats: sec.beats || 4,
+        bars: sec.bars,
+        mute: sec.mute,
+        nextSection: nextSec
+      };
+    }
+
+    function scheduler() {
+      while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+        if (!isPlaying) return;
+        scheduleNote(nextNoteTime);
+        advanceNote();
+      }
+      timerID = setTimeout(scheduler, lookahead);
+    }
+
+    function scheduleNote(time) {
+      const params = getActiveParams();
+      const beatNum = currentBeatInBar;
+      const barNum = currentBarInSection;
+      const precountNow = isPrecounting;
+      const secIdx = currentSectionIndex;
+
+      if (!params.mute || precountNow) {
+        playClickSound(time, beatNum === 0, precountNow);
+      }
+
+      const delayMs = Math.max(0, (time - audioCtx.currentTime) * 1000);
+      setTimeout(() => {
+        if (!isPlaying) return;
+        updateVisuals(params, beatNum, barNum, precountNow, secIdx);
+      }, delayMs);
+    }
+
+    function advanceNote() {
+      const params = getActiveParams();
+      const secondsPerBeat = 60.0 / params.bpm;
+      nextNoteTime += secondsPerBeat;
+
+      currentBeatInBar++;
+      if (currentBeatInBar >= params.beats) {
+        currentBeatInBar = 0;
+
+        if (isPrecounting) {
+          isPrecounting = false;
+          return;
+        }
+
+        if (currentMode === 'timeline') {
+          currentBarInSection++;
+          if (currentBarInSection >= params.bars) {
+            currentBarInSection = 0;
+            currentSectionIndex++;
+            const song = getCurrentSong();
+            if (currentSectionIndex >= song.sections.length) {
+              setTimeout(() => stopPlayback(), 150);
+            }
+          }
+        } else {
+          currentBarInSection++;
+        }
+      }
+    }
+
+    function playClickSound(time, isDownbeat, isPrecount) {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const panner = audioCtx.createStereoPanner();
+
+      const vol = parseFloat(document.getElementById('volSlider').value);
+      const pan = parseFloat(document.getElementById('panSelect').value);
+
+      if (isPrecount) {
+        osc.frequency.value = isDownbeat ? 1600 : 1100;
+      } else {
+        osc.frequency.value = isDownbeat ? 1400 : 880;
+      }
+
+      osc.type = 'triangle';
+      panner.pan.value = pan;
+
+      gain.gain.setValueAtTime(vol, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+
+      osc.connect(gain);
+      gain.connect(panner);
+      panner.connect(audioCtx.destination);
+
+      osc.start(time);
+      osc.stop(time + 0.05);
+    }
+
+    // --- 画面ビジュアル更新 ---
+    function renderBeatLamps(count) {
+      const container = document.getElementById('beatLamps');
+      container.innerHTML = '';
+      for (let i = 0; i < count; i++) {
+        const div = document.createElement('div');
+        div.className = 'lamp';
+        div.id = 'lamp-' + i;
+        div.textContent = i + 1;
+        container.appendChild(div);
+      }
+    }
+
+    function clearLamps() {
+      document.querySelectorAll('.lamp').forEach(l => {
+        l.classList.remove('active', 'active-1');
+      });
+    }
+
+    function updateVisuals(params, beatNum, barNum, precountNow, secIdx) {
+      renderBeatLamps(params.beats);
+      clearLamps();
+
+      const activeLamp = document.getElementById('lamp-' + beatNum);
+      if (activeLamp) {
+        activeLamp.classList.add(beatNum === 0 ? 'active-1' : 'active');
+      }
+
+      document.getElementById('bpmDisplay').textContent = params.bpm;
+      document.getElementById('timeSigDisplay').textContent = `${params.beats}/4 拍子`;
+
+      const monitor = document.getElementById('stageMonitor');
+
+      if (precountNow) {
+        document.getElementById('currentSectionName').textContent = 'COUNT IN (予備カウント)';
+        document.getElementById('barCounterDisplay').textContent = `あと ${params.beats - beatNum} 拍でスタート`;
+        document.getElementById('nextPreviewDisplay').textContent = `START: ${params.name} (${params.bpm} BPM)`;
+        monitor.classList.add('warn-next');
+        return;
+      }
+
+      document.getElementById('currentSectionName').textContent = params.mute ? `${params.name} [無音]` : params.name;
+
+      if (currentMode === 'timeline') {
+        const remainBars = params.bars - barNum;
+        document.getElementById('barCounterDisplay').textContent = `${barNum + 1} / ${params.bars} 小節目 (残り ${remainBars}小節)`;
+
+        if (params.nextSection) {
+          const bpmDiff = params.nextSection.bpm !== params.bpm ? ` → ${params.nextSection.bpm} BPM！` : ` (${params.nextSection.bpm} BPM)`;
+          document.getElementById('nextPreviewDisplay').textContent = `NEXT: ${params.nextSection.name}${bpmDiff}`;
+          if (remainBars === 1) {
+            monitor.classList.add('warn-next');
+          } else {
+            monitor.classList.remove('warn-next');
+          }
+        } else {
+          document.getElementById('nextPreviewDisplay').textContent = remainBars === 1 ? 'LAST BAR (最後の小節)' : '最終セクション';
+          monitor.classList.remove('warn-next');
+        }
+
+        document.querySelectorAll('.section-card').forEach((c, i) => {
+          c.classList.toggle('current-playing', i === secIdx);
+        });
+      } else {
+        document.getElementById('barCounterDisplay').textContent = `${barNum + 1} 小節目`;
+        document.getElementById('nextPreviewDisplay').textContent = 'フリークリック再生中';
+        monitor.classList.remove('warn-next');
+      }
+    }
+
+    function updateMonitorIdle() {
+      const params = getActiveParams();
+      const pl = getCurrentPlaylist();
+      const songIdx = pl.songs.findIndex(s => s.id === currentSongId);
+      const song = getCurrentSong();
+
+      renderBeatLamps(params.beats);
+      document.getElementById('currentSongBanner').textContent =
+        currentMode === 'timeline' ? `${songIdx + 1}. ${song.title}` : '単発フリークリック';
+      document.getElementById('currentSectionName').textContent = params.name;
+      document.getElementById('bpmDisplay').textContent = params.bpm;
+      document.getElementById('timeSigDisplay').textContent = `${params.beats}/4 拍子`;
+      document.getElementById('barCounterDisplay').textContent = '待機中 (STARTで再生)';
+
+      if (currentMode === 'timeline' && params.nextSection) {
+        document.getElementById('nextPreviewDisplay').textContent = `NEXT: ${params.nextSection.name} (${params.nextSection.bpm} BPM)`;
+      } else {
+        document.getElementById('nextPreviewDisplay').textContent = '';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
