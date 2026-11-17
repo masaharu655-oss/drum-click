@@ -113,6 +113,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
     background: transparent;
     border: 1px solid transparent;
   }
@@ -132,13 +133,16 @@
   .song-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .song-del {
     background: transparent;
-    border: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
     color: var(--muted);
-    font-size: 16px;
+    font-size: 11px;
+    font-weight: 600;
     padding: 4px 8px;
     cursor: pointer;
+    flex-shrink: 0;
   }
-  .song-del:hover { color: var(--danger); }
+  .song-del:hover { color: var(--danger); border-color: var(--danger); }
 
   /* Stage Area (Main) */
   .stage {
@@ -449,12 +453,19 @@
     white-space: nowrap;
   }
   .sec-del-btn {
-    background: transparent;
-    border: none;
+    background: #101217;
+    border: 1px solid var(--border);
+    border-radius: 6px;
     color: var(--muted);
-    font-size: 16px;
+    font-size: 11px;
+    font-weight: 600;
     cursor: pointer;
-    padding: 4px;
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+  .sec-del-btn:hover {
+    color: var(--danger);
+    border-color: var(--danger);
   }
 
   .sec-params {
@@ -561,11 +572,11 @@
 
 <header>
   <div class="brand">
-    <button class="btn-sm mobile-menu-btn" onclick="toggleSidebar()">☰ セトリ</button>
+    <button class="btn-sm mobile-menu-btn" onclick="toggleSidebar()">セトリ</button>
     DRUM CLICK <span>PRO</span>
   </div>
   <div class="header-actions">
-    <button class="btn-sm" onclick="nextSong()">次の曲 ⏭</button>
+    <button class="btn-sm" onclick="nextSong()">次の曲</button>
   </div>
 </header>
 
@@ -574,7 +585,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <span class="sidebar-title">SETLIST / 曲一覧</span>
-      <button class="btn-add-song" onclick="addNewSong()">＋ 曲を追加</button>
+      <button class="btn-add-song" onclick="addNewSong()">+ 曲を追加</button>
     </div>
     <div class="song-list" id="songList"></div>
   </aside>
@@ -606,7 +617,7 @@
 
       <div class="beat-lamps-wrap">
         <div class="beat-lamps" id="beatLamps"></div>
-        <div class="lamp-hint">※ランプをタップでアクセント切替（強・弱・無音）</div>
+        <div class="lamp-hint">ランプをタップでアクセント切替（強・弱・無音）</div>
       </div>
 
       <div class="transport">
@@ -618,7 +629,7 @@
     <!-- Sections List -->
     <div class="sections-header">
       <span class="sections-title">セクション構成（拍子・BPM・アクセント）</span>
-      <button class="btn-add-sec" onclick="addSection()">＋ セクション追加</button>
+      <button class="btn-add-sec" onclick="addSection()">+ セクション追加</button>
     </div>
     <div class="section-list" id="sectionList"></div>
   </main>
@@ -871,7 +882,7 @@ function renderSongList() {
         <div class="song-title">${escapeHtml(song.title)}</div>
         <div class="song-meta">BPM ${firstBpm} ・ 全${totalBars}小節</div>
       </div>
-      ${songs.length > 1 ? `<button class="song-del" onclick="deleteSong(${idx})">×</button>` : ''}
+      ${songs.length > 1 ? `<button class="song-del" onclick="deleteSong(${idx})">削除</button>` : ''}
     `;
     list.appendChild(div);
   });
@@ -947,8 +958,8 @@ function renderSections() {
       <div class="sec-top">
         <div class="sec-index">${idx + 1}</div>
         <input type="text" class="sec-name-input" value="${escapeHtml(sec.name)}" onchange="updateSec(${idx}, 'name', this.value)">
-        <button class="sec-play-btn" onclick="playFromSection(${idx})">▶ ここから</button>
-        ${song.sections.length > 1 ? `<button class="sec-del-btn" onclick="deleteSection(${idx})">🗑</button>` : ''}
+        <button class="sec-play-btn" onclick="playFromSection(${idx})">ここから再生</button>
+        ${song.sections.length > 1 ? `<button class="sec-del-btn" onclick="deleteSection(${idx})">削除</button>` : ''}
       </div>
       <div class="sec-params">
         <div class="param-box">
