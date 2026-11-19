@@ -74,7 +74,7 @@
 
   /* Sidebar (Playlist / Setlist) */
   .sidebar {
-    width: 280px;
+    width: 310px;
     background: #12141a;
     border-right: 1px solid var(--border);
     display: flex;
@@ -104,23 +104,45 @@
     flex: 1;
     overflow-y: auto;
     padding: 8px;
+    position: relative;
   }
   .song-item {
-    padding: 10px 12px;
+    padding: 10px 10px;
     border-radius: 8px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 8px;
-    background: transparent;
+    background: #161920;
     border: 1px solid transparent;
+    transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+    user-select: none;
   }
   .song-item:hover { background: var(--panel); }
   .song-item.active {
     background: var(--panel);
     border-color: var(--accent);
+  }
+  .song-item.dragging {
+    opacity: 0.9;
+    background: #232834;
+    border-color: var(--spotify);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+    transform: scale(1.02);
+    z-index: 100;
+  }
+  .song-order-num {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .song-item.active .song-order-num {
+    color: var(--spotify);
   }
   .song-info { min-width: 0; flex: 1; }
   .song-title {
@@ -131,6 +153,12 @@
     text-overflow: ellipsis;
   }
   .song-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .song-controls {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
   .song-del {
     background: transparent;
     border: 1px solid var(--border);
@@ -138,11 +166,36 @@
     color: var(--muted);
     font-size: 11px;
     font-weight: 600;
-    padding: 4px 8px;
+    padding: 4px 6px;
     cursor: pointer;
-    flex-shrink: 0;
   }
   .song-del:hover { color: var(--danger); border-color: var(--danger); }
+
+  /* Spotify-style Drag Handle */
+  .drag-handle {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    cursor: grab;
+    touch-action: none;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  .drag-handle:active {
+    cursor: grabbing;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .drag-handle span {
+    display: block;
+    width: 14px;
+    height: 2px;
+    background: var(--muted);
+    border-radius: 1px;
+  }
 
   /* Stage Area (Main) */
   .stage {
@@ -402,11 +455,20 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, transform 0.12s ease;
+    user-select: none;
   }
   .sec-card.current {
     border-color: var(--accent);
     background: #1b222c;
+  }
+  .sec-card.dragging {
+    opacity: 0.9;
+    background: #232834;
+    border-color: var(--accent);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+    transform: scale(1.01);
+    z-index: 100;
   }
   .sec-top {
     display: flex;
@@ -863,6 +925,72 @@ function toggleCountIn() {
   btn.classList.toggle('active', useCountIn);
 }
 
+// --- Spotify-style Pointer Drag & Drop Reorder ---
+function enableDragReorder(container, itemsArray, onComplete) {
+  const handles = container.querySelectorAll('.drag-handle');
+  handles.forEach(handle => {
+    handle.onpointerdown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (isPlaying) stopPlay();
+
+      const itemEl = handle.closest('[data-drag-index]');
+      const startIndex = Number(itemEl.dataset.dragIndex);
+      let currentIndex = startIndex;
+
+      itemEl.classList.add('dragging');
+      handle.setPointerCapture(e.pointerId);
+
+      const onPointerMove = (moveEvent) => {
+        const y = moveEvent.clientY;
+        const siblings = Array.from(container.querySelectorAll('[data-drag-index]'));
+
+        for (let i = 0; i < siblings.length; i++) {
+          if (i === currentIndex) continue;
+          const rect = siblings[i].getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+
+          if ((currentIndex < i && y > midY) || (currentIndex > i && y < midY)) {
+            // Swap data
+            const [moved] = itemsArray.splice(currentIndex, 1);
+            itemsArray.splice(i, 0, moved);
+
+            // Swap DOM visually
+            if (currentIndex < i) {
+              container.insertBefore(itemEl, siblings[i].nextSibling);
+            } else {
+              container.insertBefore(itemEl, siblings[i]);
+            }
+
+            // Update dataset indices
+            Array.from(container.querySelectorAll('[data-drag-index]')).forEach((el, idx) => {
+              el.dataset.dragIndex = idx;
+              const numBadge = el.querySelector('.order-badge');
+              if (numBadge) numBadge.textContent = idx + 1;
+            });
+
+            currentIndex = i;
+            break;
+          }
+        }
+      };
+
+      const onPointerUp = () => {
+        itemEl.classList.remove('dragging');
+        handle.removeEventListener('pointermove', onPointerMove);
+        handle.removeEventListener('pointerup', onPointerUp);
+        handle.removeEventListener('pointercancel', onPointerUp);
+        onComplete(startIndex, currentIndex);
+      };
+
+      handle.addEventListener('pointermove', onPointerMove);
+      handle.addEventListener('pointerup', onPointerUp);
+      handle.addEventListener('pointercancel', onPointerUp);
+    };
+  });
+}
+
 // --- UI Rendering ---
 function renderAll() {
   renderSongList();
@@ -872,19 +1000,38 @@ function renderAll() {
 function renderSongList() {
   const list = document.getElementById('songList');
   list.innerHTML = '';
+  const activeSongId = songs[currentSongIndex]?.id;
+
   songs.forEach((song, idx) => {
     const div = document.createElement('div');
     div.className = `song-item ${idx === currentSongIndex ? 'active' : ''}`;
+    div.dataset.dragIndex = idx;
+
     const firstBpm = song.sections[0] ? song.sections[0].bpm : '-';
     const totalBars = song.sections.reduce((acc, s) => acc + Number(s.bars), 0);
+
     div.innerHTML = `
+      <div class="song-order-num order-badge">${idx + 1}</div>
       <div class="song-info" onclick="selectSong(${idx})">
         <div class="song-title">${escapeHtml(song.title)}</div>
         <div class="song-meta">BPM ${firstBpm} ・ 全${totalBars}小節</div>
       </div>
-      ${songs.length > 1 ? `<button class="song-del" onclick="deleteSong(${idx})">削除</button>` : ''}
+      <div class="song-controls">
+        ${songs.length > 1 ? `<button class="song-del" onclick="deleteSong(${idx})">削除</button>` : ''}
+        <div class="drag-handle" title="ドラッグして順番を変更">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
     `;
     list.appendChild(div);
+  });
+
+  enableDragReorder(list, songs, () => {
+    // Keep tracking currently selected song after reorder
+    const newIdx = songs.findIndex(s => s.id === activeSongId);
+    if (newIdx !== -1) currentSongIndex = newIdx;
+    saveSongs();
+    renderAll();
   });
 }
 
@@ -920,7 +1067,6 @@ function renderBeatLamps(sec) {
       <div class="lamp-type">${labels[lvl]}</div>
     `;
     lamp.onclick = () => {
-      // Cycle: 2 -> 1 -> 0 -> 2
       const nextLvl = lvl === 2 ? 1 : (lvl === 1 ? 0 : 2);
       sec.accents[i] = nextLvl;
       saveSongs();
@@ -940,14 +1086,13 @@ function renderSections() {
     const card = document.createElement('div');
     card.className = 'sec-card';
     card.id = `sec-card-${idx}`;
+    card.dataset.dragIndex = idx;
 
-    // Build beat options (1 to 12)
     let beatOptions = '';
     for (let b = 1; b <= 12; b++) {
       beatOptions += `<option value="${b}" ${sec.beats === b ? 'selected' : ''}>${b} / 4</option>`;
     }
 
-    // Mini accent dots HTML
     let dotsHtml = '';
     for (let b = 0; b < sec.beats; b++) {
       const lvl = sec.accents[b] !== undefined ? sec.accents[b] : 1;
@@ -956,10 +1101,13 @@ function renderSections() {
 
     card.innerHTML = `
       <div class="sec-top">
-        <div class="sec-index">${idx + 1}</div>
+        <div class="sec-index order-badge">${idx + 1}</div>
         <input type="text" class="sec-name-input" value="${escapeHtml(sec.name)}" onchange="updateSec(${idx}, 'name', this.value)">
         <button class="sec-play-btn" onclick="playFromSection(${idx})">ここから再生</button>
         ${song.sections.length > 1 ? `<button class="sec-del-btn" onclick="deleteSection(${idx})">削除</button>` : ''}
+        <div class="drag-handle" title="ドラッグして順番を変更">
+          <span></span><span></span><span></span>
+        </div>
       </div>
       <div class="sec-params">
         <div class="param-box">
@@ -985,6 +1133,11 @@ function renderSections() {
       </div>
     `;
     list.appendChild(card);
+  });
+
+  enableDragReorder(list, song.sections, () => {
+    saveSongs();
+    renderAll();
   });
 }
 
@@ -1075,7 +1228,6 @@ function updateSec(idx, key, val) {
 function updateSecBeats(idx, newBeats) {
   const sec = songs[currentSongIndex].sections[idx];
   sec.beats = newBeats;
-  // Resize accents array
   const nextAccents = [];
   for (let i = 0; i < newBeats; i++) {
     if (sec.accents[i] !== undefined) {
